@@ -1,0 +1,1 @@
+python script/run.py -p cvpo -e Safexp-PointButton1-v0 --wandb

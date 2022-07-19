@@ -1,4 +1,20 @@
+# ===== add python path ===== #
+import glob
+import sys
+import os
+PATH = os.getcwd()
+for dir_idx, dir_name in enumerate(PATH.split('/')):
+    dir_path = '/'.join(PATH.split('/')[:(dir_idx+1)])
+    file_list = [os.path.basename(sub_dir) for sub_dir in glob.glob(f"{dir_path}/.*")]
+    if '.git_package' in file_list:
+        PATH = dir_path
+        break
+if not PATH in sys.path:
+    sys.path.append(PATH)
+# =========================== #
+
 import os.path as osp
+import wandb
 
 from safe_rl.runner import Runner
 from safe_rl.util.run_util import load_config
@@ -51,6 +67,7 @@ if __name__ == '__main__':
     parser.add_argument('--suffix', '--id', type=str, default=None)
     parser.add_argument('--no_render', action="store_true")
     parser.add_argument('--sleep', type=float, default=0.003)
+    parser.add_argument('--wandb',  action='store_true', help='use wandb?')
     args = parser.parse_args()
 
     args_dict = vars(args)
@@ -65,6 +82,16 @@ if __name__ == '__main__':
 
     config["exp_name"] = gen_exp_name(config, args.suffix)
     config["data_dir"] = gen_data_dir_name(config)
+
+    if args.wandb:
+        project_name = '[Constrained RL] SafetyGym'
+        wandb.init(
+            project=project_name, 
+            config=config,
+            sync_tensorboard=True,
+        )
+        run_idx = wandb.run.name.split('-')[-1]
+        wandb.run.name = f"{config['exp_name']}-{run_idx}"
 
     if "Safety" in args.env:
         runner = SafetyGymRunner(**config)
