@@ -14,6 +14,7 @@ if not PATH in sys.path:
 # =========================== #
 
 import os.path as osp
+import utils.register
 import wandb
 
 from safe_rl.runner import Runner
@@ -56,7 +57,7 @@ def gen_data_dir_name(config: dict):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', '-e', type=str, default='Safexp-PointButton1-v0')
+    parser.add_argument('--env', '-e', type=str, default='Safexp-PointGoal3-v0')
     parser.add_argument('--policy', '-p', type=str, default='cvpo')
     parser.add_argument('--pretrain_dir', '-pre', type=str, default=None)
     parser.add_argument('--load_dir', '-d', type=str, default=None)
@@ -88,7 +89,7 @@ if __name__ == '__main__':
         wandb.init(
             project=project_name, 
             config=config,
-            sync_tensorboard=True,
+            # sync_tensorboard=True,
         )
         run_idx = wandb.run.name.split('-')[-1]
         wandb.run.name = f"{config['exp_name']}-{run_idx}"

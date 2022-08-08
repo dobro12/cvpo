@@ -67,7 +67,7 @@ class OffPolicyWorker:
         '''
         Interact with the environment to collect data
         '''
-        obs, ep_reward, ep_len, ep_cost = self.env.reset(), 0, 0, 0
+        obs, ep_reward, ep_len, ep_cost, ep_cv = self.env.reset(), 0, 0, 0, 0
         epoch_steps = 0
         terminal_freq = 0
         done_freq = 0
@@ -93,6 +93,7 @@ class OffPolicyWorker:
             if "cost" in info:
                 cost = info["cost"]
                 ep_cost += cost
+                ep_cv += info['num_cv']
                 self.cpp_buffer.add(obs=obs,
                                     act=np.squeeze(action),
                                     rew=reward,
@@ -115,15 +116,15 @@ class OffPolicyWorker:
                                   EpCost=ep_cost,
                                   EpLen=ep_len,
                                   tab="worker")
-                obs, ep_reward, ep_len, ep_cost = self.env.reset(), 0, 0, 0
-                # break
+                # obs, ep_reward, ep_len, ep_cost, ep_cv = self.env.reset(), 0, 0, 0, 0
+                break
         self.logger.store(EpRet=ep_reward,
                           EpCost=ep_cost,
                           EpLen=ep_len,
                           Terminal=terminal_freq,
                           Done=done_freq,
                           tab="worker")
-        return epoch_steps
+        return epoch_steps, ep_reward, ep_len, ep_cost, ep_cv
 
     def eval(self):
         '''

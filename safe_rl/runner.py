@@ -12,6 +12,12 @@ from safe_rl.util.run_util import load_config, setup_eval_configs
 from safe_rl.util.torch_util import export_device_env_variable, seed_torch
 from safe_rl.worker import OffPolicyWorker, OnPolicyWorker
 
+# ======= added by dobro ======= #
+from utils.logger import Logger
+from utils.env import Env
+import wandb
+# ============================== #
+
 try:
     import bullet_safety_gym
 except ImportError:
@@ -62,6 +68,15 @@ class Runner:
         torch.set_num_threads(threads)
         export_device_env_variable(device, id=device_id)
 
+        # ======= added by dobro ======= #
+        save_dir = f"data/{data_dir}/{exp_name}"
+        self.score_logger = Logger(save_dir, 'score')
+        self.cost_logger = Logger(save_dir, 'cost')
+        self.cv_logger = Logger(save_dir, 'cv')
+        self.eplen_logger = Logger(save_dir, 'eplen')
+        self.total_steps = 0
+        # ============================== #
+
         self.episode_rerun_num = episode_rerun_num
         self.sample_episode_num = sample_episode_num
         self.evaluate_episode_num = evaluate_episode_num
@@ -99,7 +114,8 @@ class Runner:
         attrs = deepcopy(self.__dict__)
 
         # Instantiate environment
-        self.env = gym.make(env)
+        # self.env = gym.make(env)
+        self.env = Env(env, seed=seed)
         self.env.seed(seed)
         self.timeout_steps = self.env._max_episode_steps if timeout_steps == -1 else timeout_steps
 
@@ -137,7 +153,8 @@ class Runner:
     def _eval_mode_init(self, env, seed, model_path, policy, timeout_steps,
                         policy_config):
         # Instantiate environment
-        self.env = gym.make(env)
+        # self.env = gym.make(env)
+        self.env = Env(env, seed=seed)
         self.env.seed(seed)
         self.timeout_steps = self.env._max_episode_steps if timeout_steps == -1 else timeout_steps
 
@@ -160,8 +177,23 @@ class Runner:
             desc='Collecting trajectories') if self.verbose else range(
                 self.sample_episode_num)
         for i in range_instance:
-            steps = self.worker.work()
+            # ====== modified by dobro ====== #
+            steps, ep_reward, ep_len, ep_cost, ep_cv = self.worker.work()
             epoch_steps += steps
+            self.total_steps += ep_len
+            self.score_logger.write([ep_len, ep_reward])
+            self.eplen_logger.write([ep_len, ep_len])
+            self.cost_logger.write([ep_len, ep_cost])
+            self.cv_logger.write([ep_len, ep_cv])
+            print_len = 10
+            wandb.log({
+                "rollout/step": self.total_steps, 
+                "rollout/score": self.score_logger.get_avg(print_len), 
+                "rollout/ep_len": self.eplen_logger.get_avg(print_len),
+                "rollout/ep_cv": self.cv_logger.get_avg(print_len),
+                'rollout/cost': self.cost_logger.get_avg(print_len)
+            })
+            # =============================== #
 
         train_steps = self.episode_rerun_num * epoch_steps // self.batch_size
         range_instance = tqdm(
@@ -202,6 +234,12 @@ class Runner:
             # Save model
             if (epoch % self.save_freq == 0) or (epoch == self.epochs - 1):
                 self.logger.save_state({'env': self.env}, None)
+                # ======= added by dobro ======= #
+                self.score_logger.save()
+                self.cost_logger.save()
+                self.eplen_logger.save()
+                self.cv_logger.save()
+                # ============================== #
             # Log info about epoch
             self.data_dict = self._log_metrics(epoch, total_steps,
                                                time.time() - start_time, self.verbose)
